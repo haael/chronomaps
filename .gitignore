@@ -1,3 +1,4 @@
 *.nc
 maps/*
+__pycache__
 
