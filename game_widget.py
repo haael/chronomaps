@@ -1,0 +1,1 @@
+/home/haael/Projekty/chip-wars/game_widget.py
