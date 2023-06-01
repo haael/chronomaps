@@ -6,7 +6,7 @@ Generate biome background maps from NetCDF file.
 
 Attributed to: Robert Beyer
 Paper: https://www.nature.com/articles/s41597-020-0552-1
-Data: https://figshare.com/articles/dataset/LateQuaternary_Environment_nc/12293345/3
+Data: https://figshare.com/articles/dataset/LateQuaternary_Environment_nc/12293345/4
 License: CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
 """
 
