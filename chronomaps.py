@@ -20,6 +20,7 @@ from game_widget import GameWidget, surface, quantize_down, quantize_up, float_r
 
 class ChronoMaps(GameWidget):
 	biome_dir = 'biome'
+	topo_dir = 'topo'
 	
 	def __init__(self):
 		super().__init__()
@@ -62,7 +63,7 @@ class ChronoMaps(GameWidget):
 		if not -180 <= x < 180: x = (x + 180) % 360 - 180
 		if not -90 <= y < 90: y = (y + 90) % 180 - 90 
 		#print(" ", x, y)
-		image = self.load_image(f'topo/{x:+}{y:+}s{s}.png')
+		image = self.load_image(f'{topo_dir}/{x:+}{y:+}s{s}.png')
 		return image, image.get_width(), image.get_height()
 	
 	@surface
@@ -91,19 +92,18 @@ class ChronoMaps(GameWidget):
 			ctx.set_source_surface(surf)
 			ctx.paint()
 			ctx.restore()
-		ctx.set_operator(cairo.Operator.SOURCE)
 		
+		ctx.set_operator(cairo.Operator.OVER)
 		ctx.save()
 		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2 + (15 - 0.5) * self.earth_degree)
-		biome_image = self.load_image(f'biome/{self.biome_year}.png')
+		biome_image = self.load_image(f'{self.biome_dir}/{self.biome_year}.png')
 		biome_image_width = biome_image.get_width()
 		biome_image_height = biome_image.get_height()
-		#biome_image_height += 60
 		ctx.scale(self.earth_horizontal_size / biome_image_width, self.earth_vertical_size / biome_image_height)
 		ctx.set_source_surface(biome_image)
 		ctx.rectangle(0, 0, biome_image_width, biome_image_height)
 		ctx.clip()
-		ctx.paint_with_alpha(0.5)
+		ctx.paint()
 		ctx.restore()
 		
 		'''

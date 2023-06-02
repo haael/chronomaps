@@ -70,10 +70,13 @@ if __name__ == '__main__':
 		pass
 	
 	for year_idx, year in enumerate(years):
-		surface = cairo.ImageSurface(cairo.Format.RGB24, 720, 360)
+		surface = cairo.ImageSurface(cairo.Format.ARGB32, 720, 360)
 		ctx = cairo.Context(surface)
-		ctx.set_source_rgb(0, 0, 0)
-		ctx.paint()
+		
+		#cts.set_operator(cairo.Operator.CLEAR)
+		#ctx.set_source_rgba(0, 0, 0, 0)
+		#ctx.paint()
+		#cts.set_operator(cairo.Operator.OVER)
 		
 		b = biome[year_idx]
 		
@@ -86,12 +89,14 @@ if __name__ == '__main__':
 				vs.add(v)
 			
 			if isnan(v):
-				rgb = None
+				rgba = None
+			elif v == 28:
+				rgba = 1, 1, 1, 1
 			else:
-				rgb = colors[int(v)]
+				rgba = colors[int(v)] + (0.33,)
 			
-			if rgb:
-				ctx.set_source_rgb(*rgb)
+			if rgba:
+				ctx.set_source_rgba(*rgba)
 				ctx.rectangle(x, lm - y, 1, 1)
 				ctx.fill()
 		

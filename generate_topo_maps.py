@@ -38,8 +38,8 @@ for xa, ya in product(range(-180, 180, step), range(-90, 90, step)):
 		for xb, row in enumerate(box):
 			for yb, value in enumerate(row):
 				if value > 0:
-					k = atan(value / 1000)
-					rgb = k / 2, 1 - k / 2, 0
+					k = atan(value / 10000)
+					rgb = k, 1 - k / 4, 0
 				else:
 					k = 1 + atan(value / 10000)
 					rgb = k, k, 1
