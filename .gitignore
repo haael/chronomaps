@@ -1,4 +1,5 @@
-*.nc
-maps/*
+data/*
+topo/*
+biome/*
 __pycache__/*
 

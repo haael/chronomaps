@@ -10,24 +10,16 @@ Data: https://figshare.com/articles/dataset/LateQuaternary_Environment_nc/122933
 License: CC BY 4.0 https://creativecommons.org/licenses/by/4.0/
 """
 
-import numpy as np
+#import numpy as np
 import netCDF4 as nc4
 from math import ceil, isnan
 from itertools import product
 import cairo
-
-
-nc = nc4.Dataset('LateQuaternary_Environment.nc', 'r')
-longitude   = nc.variables['longitude'][...]
-latitude    = nc.variables['latitude'][...]
-years       = nc.variables['time'][...]
-#months      = nc.variables['month']
-#temperature = nc.variables['temperature']
-biome       = nc.variables['biome']
+from os import mkdir
 
 
 colors = [
-	(0.4, 1, 0.4), # shore
+	(0.4, 0.4, 0.4), # shore
 	(0.1, 1, 0.1), # tropical forest
 	(0.2, 1, 0.2), # tropical forest
 	(0.3, 1, 0.3), # tropical forest
@@ -59,31 +51,50 @@ colors = [
 ]
 
 
-for year_idx, year in enumerate(years):
-	surface = cairo.ImageSurface(cairo.Format.RGB24, 720, 360)
-	ctx = cairo.Context(surface)
+data_file = 'data/LateQuaternary_Environment.nc'
+output_dir = 'biome'
+
+
+if __name__ == '__main__':	
+	nc = nc4.Dataset(data_file, 'r')
+	longitude   = nc.variables['longitude'][...]
+	latitude    = nc.variables['latitude'][...]
+	years       = nc.variables['time'][...]
+	#months      = nc.variables['month']
+	#temperature = nc.variables['temperature']
+	biome       = nc.variables['biome']
 	
-	b = biome[year_idx]
+	try:
+		mkdir(output_dir)
+	except FileExistsError:
+		pass
 	
-	vs = set()
-	lm = latitude.shape[0]
-	for x, y in product(range(longitude.shape[0]), range(latitude.shape[0])):
-		v = b[y, x]
-		#lat = latitude[x]
-		#lon = longitude[y]
-		#print(x, y, v)
+	for year_idx, year in enumerate(years):
+		surface = cairo.ImageSurface(cairo.Format.RGB24, 720, 360)
+		ctx = cairo.Context(surface)
+		ctx.set_source_rgb(0, 0, 0)
+		ctx.paint()
 		
-		if not isnan(v):
-			vs.add(v)
+		b = biome[year_idx]
 		
-		if isnan(v):
-			rgb = 0, 0, 0.5
-		else:
-			rgb = colors[int(v)]
+		vs = set()
+		lm = latitude.shape[0]
+		for x, y in product(range(longitude.shape[0]), range(latitude.shape[0])):
+			v = b[y, x]
+			
+			if not isnan(v):
+				vs.add(v)
+			
+			if isnan(v):
+				rgb = None
+			else:
+				rgb = colors[int(v)]
+			
+			if rgb:
+				ctx.set_source_rgb(*rgb)
+				ctx.rectangle(x, lm - y, 1, 1)
+				ctx.fill()
 		
-		ctx.set_source_rgb(*rgb)
-		ctx.rectangle(x - 0.5, lm - y - 0.5, 1, 1)
-		ctx.fill()
-	
-	surface.flush()
-	surface.write_to_png(f'maps/{abs(year)}.png')
+		surface.flush()
+		surface.write_to_png(f'{output_dir}/{abs(year)}.png')
+

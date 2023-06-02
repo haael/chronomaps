@@ -19,73 +19,94 @@ from game_widget import GameWidget, surface, quantize_down, quantize_up, float_r
 
 
 class ChronoMaps(GameWidget):
+	biome_dir = 'biome'
+	
 	def __init__(self):
 		super().__init__()
-		self.earth_horizontal_size = 15000
-		self.earth_vertical_size = 7500
-		
-		loader = GdkPixbuf.PixbufLoader.new_with_mime_type('image/jpeg')
-		loader.write(Path('earth.jpg').read_bytes())
-		loader.close()
-		pixbuf = loader.get_pixbuf()
-		self.earth_image = Gdk.cairo_surface_create_from_pixbuf(pixbuf, 0, None)
-		self.earth_image_width = pixbuf.get_width()
-		self.earth_image_height = pixbuf.get_height()
-		
+		self.earth_degree = 42
+		self.earth_horizontal_size = self.earth_degree * 360
+		self.earth_vertical_size = self.earth_degree * 180		
+		self.biome_year = None
+		self.set_year_bp(0)
+	
+	@surface
+	def load_image(self, filename):
 		loader = GdkPixbuf.PixbufLoader.new_with_mime_type('image/png')
-		loader.write(Path('maps/0.png').read_bytes())
+		loader.write(Path(filename).read_bytes())
 		loader.close()
 		pixbuf = loader.get_pixbuf()
-		self.biome_image = Gdk.cairo_surface_create_from_pixbuf(pixbuf, 0, None)
-		self.biome_image_width = pixbuf.get_width()
-		self.biome_image_height = pixbuf.get_height()
-		self.biome_year = 0
+		image = Gdk.cairo_surface_create_from_pixbuf(pixbuf, 0, None)
+		#image_width = pixbuf.get_width()
+		#image_height = pixbuf.get_height()
+		#return image, image_width, image_height
+		return image
 	
 	def set_year_bp(self, year_bp):
-		years = [int(p.stem) for p in Path('maps').iterdir() if p.suffix == '.png']
+		years = [int(p.stem) for p in Path(f'{self.biome_dir}').iterdir() if p.suffix == '.png']
 		year = min(_y for _y in years if _y >= year_bp)
-		
 		if year == self.biome_year: return
-		
-		loader = GdkPixbuf.PixbufLoader.new_with_mime_type('image/png')
-		loader.write(Path(f'maps/{year}.png').read_bytes())
-		loader.close()
-		pixbuf = loader.get_pixbuf()
-		self.biome_image = Gdk.cairo_surface_create_from_pixbuf(pixbuf, 0, None)
-		self.biome_image_width = pixbuf.get_width()
-		self.biome_image_height = pixbuf.get_height()
 		self.biome_year = year
-		
 		self.invalidate('render_grid')
+	
+	def get_tile(self, x, y, s):
+		#print(x, y)
+		if s <= 1:
+			s = 1
+		elif 1 < s <= 2:
+			s = 2
+		elif 2 < s <= 4:
+			s = 4
+		else:
+			s = 8
+		
+		if not -180 <= x < 180: x = (x + 180) % 360 - 180
+		if not -90 <= y < 90: y = (y + 90) % 180 - 90 
+		#print(" ", x, y)
+		image = self.load_image(f'topo/{x:+}{y:+}s{s}.png')
+		return image, image.get_width(), image.get_height()
 	
 	@surface
 	def render_grid(self):
 		terrain_scale = self.terrain_scale
 		viewport_width, viewport_height, viewport_left, viewport_right, viewport_top, viewport_bottom = self.viewport_extents()
-		#print("render_grid", viewport_width, viewport_height, self.terrain_scale)
 		
-		surface = cairo.RecordingSurface(cairo.Content.COLOR_ALPHA, None)
+		surface = cairo.ImageSurface(cairo.Format.RGB24, self.screen_width + 2 * self.scroll_redraw_rect_x, self.screen_height + 2 * self.scroll_redraw_rect_y)
 		ctx = cairo.Context(surface)
-		ctx.scale(1/self.terrain_scale, 1/self.terrain_scale)
-		
-		ctx.save()
-		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2)
-		ctx.scale(self.earth_horizontal_size / self.earth_image_width, self.earth_vertical_size / self.earth_image_height)
-		ctx.set_source_surface(self.earth_image)
-		ctx.rectangle(0, 0, self.earth_image_width, self.earth_image_height)
-		ctx.clip()
+		ctx.translate((self.screen_width + 2 * self.scroll_redraw_rect_x) / 2 + self.terrain_x, (self.screen_height + 2 * self.scroll_redraw_rect_y) / 2 + self.terrain_y)
+		ctx.scale(1 / terrain_scale, 1 / terrain_scale)
+		ctx.set_source_rgb(1, 1, 1)
 		ctx.paint()
-		ctx.restore()
+		
+		ctx.set_operator(cairo.Operator.HSL_LUMINOSITY)
+		for x, y in self.grid_points(self.earth_degree * 15, self.earth_degree * 15):
+			xx = int(x / self.earth_degree)
+			yy = -int(y / self.earth_degree)
+			if not -90 <= yy < 90: continue
+			surf, w, h = self.get_tile(xx, yy, terrain_scale)
+			ctx.save()
+			ctx.translate(x, y)
+			ctx.rectangle(0, 0, self.earth_degree * 15, self.earth_degree * 15)
+			ctx.clip()
+			ctx.scale((self.earth_degree * 15 + 1) / w, (self.earth_degree * 15 + 1) / h)
+			ctx.set_source_surface(surf)
+			ctx.paint()
+			ctx.restore()
+		ctx.set_operator(cairo.Operator.SOURCE)
 		
 		ctx.save()
-		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2)
-		ctx.scale(self.earth_horizontal_size / self.biome_image_width, self.earth_vertical_size / self.biome_image_height)
-		ctx.set_source_surface(self.biome_image)
-		ctx.rectangle(0, 0, self.biome_image_width, self.biome_image_height)
+		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2 + (15 - 0.5) * self.earth_degree)
+		biome_image = self.load_image(f'biome/{self.biome_year}.png')
+		biome_image_width = biome_image.get_width()
+		biome_image_height = biome_image.get_height()
+		#biome_image_height += 60
+		ctx.scale(self.earth_horizontal_size / biome_image_width, self.earth_vertical_size / biome_image_height)
+		ctx.set_source_surface(biome_image)
+		ctx.rectangle(0, 0, biome_image_width, biome_image_height)
 		ctx.clip()
 		ctx.paint_with_alpha(0.5)
 		ctx.restore()
 		
+		'''
 		min_viewport_top = -self.earth_vertical_size / 2
 		max_viewport_bottom = self.earth_vertical_size / 2
 		viewport_top = max(min_viewport_top, viewport_top)
@@ -131,9 +152,17 @@ class ChronoMaps(GameWidget):
 				ctx.move_to(viewport_left, y)
 				ctx.line_to(viewport_right, y)
 				ctx.stroke()
+		'''
 		
 		surface.flush()
-		return surface
+		
+		surface_r = cairo.RecordingSurface(cairo.Content.COLOR_ALPHA, None)
+		ctx = cairo.Context(surface_r)
+		ctx.translate(-(self.screen_width + 2 * self.scroll_redraw_rect_x) / 2 - self.terrain_x, -(self.screen_height + 2 * self.scroll_redraw_rect_y) / 2 - self.terrain_y)
+		ctx.set_source_surface(surface)
+		ctx.paint()
+		surface_r.flush()
+		return surface_r
 
 
 class UserInterface:
