@@ -19,8 +19,8 @@ from game_widget import GameWidget, surface, quantize_down, quantize_up, float_r
 
 
 class ChronoMaps(GameWidget):
-	biome_dir = 'biome'
-	topo_dir = 'topo'
+	biome_imgs = 'biome', 'svg'
+	topo_imgs = 'topo', 'png'
 	
 	def __init__(self):
 		super().__init__()
@@ -30,21 +30,46 @@ class ChronoMaps(GameWidget):
 		self.biome_year = None
 		self.set_year_bp(0)
 	
-	@surface
-	def load_image(self, filename):
-		loader = GdkPixbuf.PixbufLoader.new_with_mime_type('image/png')
+	def load_pixbuf(self, filename, mime):
+		loader = GdkPixbuf.PixbufLoader.new_with_mime_type(mime)
 		loader.write(Path(filename).read_bytes())
 		loader.close()
 		pixbuf = loader.get_pixbuf()
 		image = Gdk.cairo_surface_create_from_pixbuf(pixbuf, 0, None)
-		#image_width = pixbuf.get_width()
-		#image_height = pixbuf.get_height()
-		#return image, image_width, image_height
-		return image
+		width = pixbuf.get_width()
+		height = pixbuf.get_height()
+		return image, width, height
+	
+	def load_svg(self, filename):
+		rsvg = Rsvg.Handle.new_from_file(filename)
+		image = cairo.RecordingSurface(cairo.Content.COLOR_ALPHA, (0, 0, rsvg.props.width, rsvg.props.height))
+		ctx = cairo.Context(image)
+		
+		rect = Rsvg.Rectangle()
+		rect.width = rsvg.props.width
+		rect.height = rsvg.props.height
+		
+		rsvg.render_document(ctx, rect)
+		
+		width = rsvg.props.width
+		height = rsvg.props.height
+		return image, width, height
+	
+	@surface
+	def load_image(self, filename):
+		ext = filename.split('.')[-1]
+		if ext == 'png':
+			return self.load_pixbuf(filename, 'image/png')
+		elif ext == 'svg':
+			return self.load_svg(filename)
+		else:
+			raise NotImplementedError
 	
 	def set_year_bp(self, year_bp):
-		years = [int(p.stem) for p in Path(f'{self.biome_dir}').iterdir() if p.suffix == '.png']
-		year = min(_y for _y in years if _y >= year_bp)
+		biome_dir, biome_ext = self.biome_imgs
+		years = [int(p.stem) for p in Path(biome_dir).iterdir() if p.suffix == '.' + biome_ext]
+		#print(year_bp, [_y for _y in years if _y >= -year_bp])
+		year = min(_y for _y in years if _y >= -year_bp)
 		if year == self.biome_year: return
 		self.biome_year = year
 		self.invalidate('render_grid')
@@ -63,8 +88,10 @@ class ChronoMaps(GameWidget):
 		if not -180 <= x < 180: x = (x + 180) % 360 - 180
 		if not -90 <= y < 90: y = (y + 90) % 180 - 90 
 		#print(" ", x, y)
-		image = self.load_image(f'{topo_dir}/{x:+}{y:+}s{s}.png')
-		return image, image.get_width(), image.get_height()
+		
+		topo_dir, topo_ext = self.topo_imgs
+		image, width, height = self.load_image(f'{topo_dir}/{x:+}{y:+}s{s}.{topo_ext}')
+		return image, width, height
 	
 	@surface
 	def render_grid(self):
@@ -95,10 +122,9 @@ class ChronoMaps(GameWidget):
 		
 		ctx.set_operator(cairo.Operator.OVER)
 		ctx.save()
-		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2 + (15 - 0.5) * self.earth_degree)
-		biome_image = self.load_image(f'{self.biome_dir}/{self.biome_year}.png')
-		biome_image_width = biome_image.get_width()
-		biome_image_height = biome_image.get_height()
+		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2 + (15 * self.earth_degree))
+		biome_dir, biome_ext = self.biome_imgs
+		biome_image, biome_image_width, biome_image_height = self.load_image(f'{biome_dir}/{self.biome_year}.{biome_ext}')
 		ctx.scale(self.earth_horizontal_size / biome_image_width, self.earth_vertical_size / biome_image_height)
 		ctx.set_source_surface(biome_image)
 		ctx.rectangle(0, 0, biome_image_width, biome_image_height)
