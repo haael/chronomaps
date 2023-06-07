@@ -48,7 +48,7 @@ colors = [
 	(0.5, 0.6, 0.9), # far north
 	(0.5, 0.4, 0.9), # arctic
 	(0.5, 0.2, 0.9), # arctic
-	(0.7, 0.7, 0.0), # dessert, minor
+	(0.6, 0.6, 0.0), # dessert, minor
 	(1, 1, 1) # glacier
 ]
 
@@ -65,7 +65,6 @@ def neighbors_of(x, y):
 def solve_maze(sx, sy, points, stick, o=None):
 	if o is None:
 		o = sx, sy
-	#print("solve_maze", sx, sy, len(points), depth)
 	assert (sx, sy) in points
 	
 	x, y = sx, sy
@@ -74,9 +73,20 @@ def solve_maze(sx, sy, points, stick, o=None):
 		solution.append((x, y))
 		points.remove((x, y))
 		stick_to = frozenset(neighbors_of(x, y)) & stick
-		neighbors = frozenset(_n for _n in neighbors_of(x, y) if _n in points and any(_nn in stick_to for _nn in neighbors_of(*_n)))
 		
-		#print(len(neighbors), len(points))
+		neighbors = set()
+		for nx, ny in neighbors_of(x, y):
+			if (nx, ny) not in points: continue
+			dx = nx - x
+			dy = ny - y
+			for px, py in neighbors_of(x, y):
+				if (px, py) not in stick: continue
+				qx = px - x
+				qy = py - y
+				if dx * qy - dy * qx > 0:
+					neighbors.add((nx, ny))
+					break
+		
 		if len(neighbors) == 0:
 			return solution
 		elif len(neighbors) == 1:
@@ -102,9 +112,11 @@ def create_map(year, biome_points, lon, lat):
 	surface = cairo.SVGSurface(f'biome/{year}.svg', 720, 360)
 	ctx = cairo.Context(surface)
 	
+	ctx.set_line_width(0.5)
+	ctx.set_line_join(cairo.LineJoin.ROUND)
+	ctx.set_line_cap(cairo.LineCap.ROUND)
+	
 	for w, color in enumerate(colors):
-		#print("color", w)
-			
 		interior_points = set()
 		edge_points = set()		
 		for x, y in product(range(lon), range(lat)):
@@ -126,8 +138,6 @@ def create_map(year, biome_points, lon, lat):
 				edge_points.add((x, y))
 			else:
 				interior_points.add((x, y))
-
-		#print("edge_points", len(edge_points), "interior_points", len(interior_points))
 		
 		if not edge_points:
 			continue
@@ -149,46 +159,49 @@ def create_map(year, biome_points, lon, lat):
 		else:
 			ctx.set_source_rgba(*color, 0.33)
 		
-		#print("border_points", len(outer_border_points), len(inner_border_points), "other_points", len(other_points))
 		for x, y in other_points:
 			ctx.arc(x + 0.5, y + 0.5, 0.5, 0, 2 * pi)
 			ctx.fill()
 		
-		#for x, y in border_points:
-		#	ctx.arc(x, y, 1, 0, 2 * pi)
-		#	ctx.fill()
-		
 		points = set(outer_border_points)
+		paths = []
 		while points:
 			sx, sy = next(iter(points))
 			solution = solve_maze(sx, sy, set(points), inner_border_points)
 			assert solution[0] == (sx, sy)
-			
-			
-			
-			#if len(solution) <= 3:
-			#	print((sx, sy), solution)
-			
-			if len(solution) <= 3:
-				for x, y in solution:
-					ctx.arc(x + 0.5, y + 0.5, 0.5, 0, 2 * pi)
-					ctx.fill()
-			else:
-				ex, ey = solution[-1]
-				
-				ctx.set_line_width(0.5)
-				ctx.move_to(sx + 0.5, sy + 0.5)
-				
-				for x, y in solution[1:]:
-					ctx.line_to(x + 0.5, y + 0.5)
-				
-				if abs(sx - ex) <= 2 and abs(sy - ey) <= 2:
-					ctx.close_path()
-					ctx.fill()
-				else:
-					ctx.stroke()
-			
+			paths.append(solution)
 			points -= frozenset(solution)
+		
+		while paths:
+			path = paths.pop()
+			sx, sy = path[0]
+			ctx.move_to(sx + 0.5, sy + 0.5)
+			
+			while True:
+				for x, y in path[1:]:
+					ctx.line_to(x + 0.5, y + 0.5)
+				ex, ey = path[-1]
+				
+				ns = max(abs(sx - ex), abs(sy - ey))
+				np = 0
+				for p in paths:
+					np = max(np, abs(p[0][0] - ex), abs(p[0][1] - ey))
+				
+				if ns < np:
+					ctx.close_path()
+					break
+				else:
+					for p in paths:
+						if max(abs(p[0][0] - ex), abs(p[0][1] - ey)) <= np:
+							paths.remove(p)
+							path = p
+							sx, sy = path[0]
+							break
+					else:
+						break
+			
+			ctx.close_path()
+		ctx.fill()
 	
 	surface.flush()
 
