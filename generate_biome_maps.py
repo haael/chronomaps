@@ -35,7 +35,7 @@ colors = [
 	(0.8, 0.5, 0.2), # tundra, north asia
 	(0.1, 0.9, 0.1), # tropical forest
 	(0.9, 0.5, 0.1), # equator, steppe
-	(0.9, 0.4, 0.9), # mountains
+	(0.9, 0.2, 0.9), # mountains
 	(0.9, 0.5, 0.2), # sth europe, sth africa, sth australia, west americs
 	(0.9, 0.5, 0.3), # america, asia (minor)
 	(0.9, 0.5, 0.4), # shore, minor
@@ -43,12 +43,12 @@ colors = [
 	(0.8, 0.4, 0.1), # cancer, minor
 	(0.8, 0.4, 0.2), # america, asia
 	(0.9, 0.9, 0), # dessert
-	(0.9, 0.5, 0.9), # glacier, high mountains
+	(0.9, 0.4, 0.9), # glacier, high mountains
 	(0.9, 0.6, 0.9), # high mountains, far north
-	(0.9, 0.7, 0.9), # far north
-	(0.9, 0.8, 0.9), # arctic
-	(0.9, 0.9, 0.9), # arctic
-	(0.9, 0.9, 0.2), # dessert, minor
+	(0.5, 0.6, 0.9), # far north
+	(0.5, 0.4, 0.9), # arctic
+	(0.5, 0.2, 0.9), # arctic
+	(0.7, 0.7, 0.0), # dessert, minor
 	(1, 1, 1) # glacier
 ]
 
@@ -177,7 +177,7 @@ def create_map(year, biome_points, lon, lat):
 				ex, ey = solution[-1]
 				
 				ctx.set_line_width(0.5)
-				ctx.move_to(sx, sy)
+				ctx.move_to(sx + 0.5, sy + 0.5)
 				
 				for x, y in solution[1:]:
 					ctx.line_to(x + 0.5, y + 0.5)
