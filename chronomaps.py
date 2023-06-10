@@ -105,7 +105,23 @@ class ChronoMaps(GameWidget):
 		ctx.set_source_rgb(1, 1, 1)
 		ctx.paint()
 		
-		ctx.set_operator(cairo.Operator.HSL_LUMINOSITY)
+		ctx.set_operator(cairo.Operator.OVER)
+		ctx.save()
+		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2 + (15 * self.earth_degree))
+		biome_dir, biome_ext = self.biome_imgs
+		biome_image, biome_image_width, biome_image_height = self.load_image(f'{biome_dir}/{self.biome_year}.{biome_ext}')
+		ctx.scale(self.earth_horizontal_size / biome_image_width, self.earth_vertical_size / biome_image_height)
+		ctx.set_source_surface(biome_image)
+		ctx.rectangle(0, 0, biome_image_width, biome_image_height)
+		ctx.clip()
+		ctx.paint_with_alpha(0.5)
+		ctx.restore()
+		
+		ctx.push_group()
+		ctx.set_operator(cairo.Operator.OVER)
+		ctx.set_source_rgb(0, 1, 0)
+		ctx.paint()
+		ctx.set_operator(cairo.Operator.MULTIPLY)
 		for x, y in self.grid_points(self.earth_degree * 15, self.earth_degree * 15):
 			xx = int(x / self.earth_degree)
 			yy = -int(y / self.earth_degree)
@@ -119,18 +135,28 @@ class ChronoMaps(GameWidget):
 			ctx.set_source_surface(surf)
 			ctx.paint()
 			ctx.restore()
-		
-		ctx.set_operator(cairo.Operator.OVER)
-		ctx.save()
-		ctx.translate(-self.earth_horizontal_size / 2, -self.earth_vertical_size / 2 + (15 * self.earth_degree))
-		biome_dir, biome_ext = self.biome_imgs
-		biome_image, biome_image_width, biome_image_height = self.load_image(f'{biome_dir}/{self.biome_year}.{biome_ext}')
-		ctx.scale(self.earth_horizontal_size / biome_image_width, self.earth_vertical_size / biome_image_height)
-		ctx.set_source_surface(biome_image)
-		ctx.rectangle(0, 0, biome_image_width, biome_image_height)
-		ctx.clip()
+		ctx.set_operator(cairo.Operator.ADD)
+		ctx.set_source_rgb(0.25, 0.25, 0.25)
 		ctx.paint()
+		ctx.pop_group_to_source()
+		ctx.set_operator(cairo.Operator.HSL_LUMINOSITY)
+		ctx.paint()
+		
+		for x in self.grid_lines_horizontal(self.earth_degree * 15):
+			ctx.move_to(x, viewport_top)
+			ctx.line_to(x, viewport_bottom)
+		for y in self.grid_lines_vertical(self.earth_degree * 15):
+			ctx.move_to(viewport_left, y)
+			ctx.line_to(viewport_right, y)
+		
+		ctx.save()
+		ctx.identity_matrix()
+		ctx.set_line_width(1)
+		ctx.set_operator(cairo.Operator.OVER)
+		ctx.set_source_rgba(0.75, 0.75, 0.75, 0.33)
+		ctx.stroke()
 		ctx.restore()
+		
 		
 		'''
 		min_viewport_top = -self.earth_vertical_size / 2

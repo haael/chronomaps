@@ -21,34 +21,44 @@ from multiprocessing import Pool
 
 
 colors = [
-	(0.4, 0.4, 0.4), # shore
-	(0.1, 1, 0.1), # tropical forest
-	(0.2, 1, 0.2), # tropical forest
-	(0.3, 1, 0.3), # tropical forest
-	(0.5, 0.8, 0.5), # ??? (mid)
-	(0.4, 0.8, 0.4), # ??? (incl north)
-	(0.3, 0.8, 0.3), # europe, china (sth)
-	(0.2, 0.8, 0.2), # europe, china (nth)
-	(0.1, 0.8, 0.1), # america, europe (nth)
-	(0.0, 0.8, 0.0), # america, asia
+	(0.4, 0.4, 0.0), # shore
+
+	(0.1, 0.9, 0.1), # tropical forest
+	(0.3, 0.9, 0.3), # tropical forest
+	(0.5, 0.9, 0.5), # tropical forest
+
+	(0.6, 0.8, 0.5), # ??? (mid)
+	(0.5, 0.8, 0.4), # ??? (incl north)
+	(0.4, 0.8, 0.3), # europe, china (sth)
+	(0.3, 0.8, 0.2), # europe, china (nth)
+	(0.2, 0.8, 0.1), # america, europe (nth)
+	(0.1, 0.8, 0.0), # america, asia
+
 	(0.8, 0.5, 0.1), # tundra
 	(0.8, 0.5, 0.2), # tundra, north asia
-	(0.1, 0.9, 0.1), # tropical forest
+
+	(0.7, 0.9, 0.7), # tropical forest
+
 	(0.9, 0.5, 0.1), # equator, steppe
-	(0.9, 0.2, 0.9), # mountains
+
+	(0.6, 0, 0.9), # mountains
+
 	(0.9, 0.5, 0.2), # sth europe, sth africa, sth australia, west americs
 	(0.9, 0.5, 0.3), # america, asia (minor)
 	(0.9, 0.5, 0.4), # shore, minor
+
 	(0.6, 0.4, 0.6), # -
 	(0.8, 0.4, 0.1), # cancer, minor
 	(0.8, 0.4, 0.2), # america, asia
 	(0.9, 0.9, 0), # dessert
-	(0.9, 0.4, 0.9), # glacier, high mountains
-	(0.9, 0.6, 0.9), # high mountains, far north
-	(0.5, 0.6, 0.9), # far north
-	(0.5, 0.4, 0.9), # arctic
-	(0.5, 0.2, 0.9), # arctic
-	(0.6, 0.6, 0.0), # dessert, minor
+
+	(0.5, 0, 0.8), # glacier, high mountains
+	(0.4, 0, 0.7), # high mountains, far north
+	(0.3, 0, 0.6), # far north
+	(0.2, 0, 0.5), # arctic
+	(0.1, 0, 0.4), # arctic
+
+	(0.5, 0.4, 0.0), # dessert, minor
 	(1, 1, 1) # glacier
 ]
 
@@ -112,9 +122,11 @@ def create_map(year, biome_points, lon, lat):
 	surface = cairo.SVGSurface(f'biome/{year}.svg', 720, 360)
 	ctx = cairo.Context(surface)
 	
-	ctx.set_line_width(0.5)
+	ctx.set_line_width(1)
 	ctx.set_line_join(cairo.LineJoin.ROUND)
 	ctx.set_line_cap(cairo.LineCap.ROUND)
+	
+	points_to_draw = {}
 	
 	for w, color in enumerate(colors):
 		interior_points = set()
@@ -153,23 +165,26 @@ def create_map(year, biome_points, lon, lat):
 				other_points.add((x, y))
 		
 		del edge_points, interior_points
+
+		points_to_draw[w] = inner_border_points, outer_border_points, other_points
+	
+	for w, color in reversed(list(enumerate(colors))):
+		try:
+			inner_border_points, outer_border_points, other_points = points_to_draw[w]
+		except KeyError:
+			continue
 		
-		if w == 28:
-			ctx.set_source_rgba(*color, 1)
-		else:
-			ctx.set_source_rgba(*color, 0.33)
-		
-		for x, y in other_points:
-			ctx.arc(x + 0.5, y + 0.5, 0.5, 0, 2 * pi)
-			ctx.fill()
-		
+		ctx.set_source_rgb(*color)
 		points = set(outer_border_points)
 		paths = []
 		while points:
 			sx, sy = next(iter(points))
 			solution = solve_maze(sx, sy, set(points), inner_border_points)
 			assert solution[0] == (sx, sy)
-			paths.append(solution)
+			if len(solution) > 1:
+				paths.append(solution)
+			else:
+				other_points.add(solution[0])
 			points -= frozenset(solution)
 		
 		while paths:
@@ -196,12 +211,33 @@ def create_map(year, biome_points, lon, lat):
 							paths.remove(p)
 							path = p
 							sx, sy = path[0]
+							ctx.line_to(sx + 0.5, sy + 0.5)
 							break
 					else:
 						break
 			
 			ctx.close_path()
-		ctx.fill()
+		ctx.fill_preserve()
+		ctx.stroke()
+	
+	for w, color in reversed(list(enumerate(colors))):
+		try:
+			inner_border_points, outer_border_points, other_points = points_to_draw[w]
+		except KeyError:
+			continue
+		
+		gradient = cairo.RadialGradient(0, 0, 0, 0, 0, 1)
+		gradient.add_color_stop_rgba(0, *color, 1)
+		gradient.add_color_stop_rgba(1, *color, 0)
+		#ctx.set_source_rgb(*color)
+		
+		for x, y in other_points:
+			matrix = cairo.Matrix()
+			matrix.translate(-x - 0.5, -y - 0.5)
+			gradient.set_matrix(matrix)
+			ctx.set_source(gradient)
+			ctx.arc(x + 0.5, y + 0.5, 1, 0, 2 * pi)
+			ctx.fill()
 	
 	surface.flush()
 
